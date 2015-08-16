@@ -13,12 +13,9 @@ import java.util.Arrays;
 /**
  * Created by Saeed on 8/1/14.
  */
-public class Graph {
-    int[] vertices;
-    IntObjectHashMap<int[]> neighbors = new IntObjectHashMap<int[]>();
-
-    public static Graph buildFromEdgeListFile(String path) throws IOException {
-        Graph table = new Graph();
+public class PrunedGraph extends Graph {
+    public static PrunedGraph buildFromEdgeListFile(String path) throws IOException {
+        PrunedGraph table = new PrunedGraph();
         IntObjectHashMap<IntHashSet> neighbors = new IntObjectHashMap<IntHashSet>();
 
         BufferedReader br = new BufferedReader(new FileReader(path));
@@ -41,8 +38,10 @@ public class Graph {
                 neighbors.put(src, new IntHashSet());
             if (!neighbors.containsKey(dest))
                 neighbors.put(dest, new IntHashSet());
-            neighbors.get(src).add(dest);
-            neighbors.get(dest).add(src);
+            if (dest > src)
+                neighbors.get(src).add(dest);
+            if (src > dest)
+                neighbors.get(dest).add(src);
         }
 
         table.vertices = neighbors.keys().toArray();
@@ -58,24 +57,11 @@ public class Graph {
         return table;
     }
 
-    public int[] getNeighbors(int v) {
-        return neighbors.get(v);
-    }
-
     protected int edgeCount() {
         int edges = 0;
         for (IntObjectCursor<int[]> x : neighbors)
             edges += x.value.length;
-        return edges / 2;
+        return edges;
     }
-
-    public String getInfo() {
-        String info = "#Nodes: " + String.format("%,d", vertices.length) + "\n";
-        int edges = edgeCount();
-        info += "#Edges: " + String.format("%,d", edges) + "\n";
-        info += "AVG(degree): " + String.format("%.2f", edges / (double) vertices.length);
-        return info;
-    }
-
 
 }

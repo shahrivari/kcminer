@@ -9,15 +9,30 @@ import java.io.IOException;
  */
 public class Main {
     public static void main(String[] args) throws IOException, InterruptedException {
-        Stopwatch stopwatch = Stopwatch.createStarted();
-        Graph graph = Graph.buildFromEdgeListFile("X:\\networks\\kcminer\\epin.txt");
+        int size = 7;
+        int threads = 8;
+        String graph_path = "X:\\networks\\kcminer\\epin.txt";
+        Graph graph;
+        long count;
+        Stopwatch stopwatch = Stopwatch.createUnstarted();
+
+        stopwatch.reset().start();
+        graph = Graph.buildFromEdgeListFile(graph_path);
         System.out.println(graph.getInfo());
         System.out.println("Took:" + stopwatch);
         stopwatch.reset().start();
+        count = KlikState.parallelEnumerate(new RawKlikStateMan(), graph, size, size, threads, null);
+        System.out.printf("%,d\n", count);
+        System.out.println("Took:" + stopwatch);
+        System.out.println("=========================");
 
-        int size = 7;
-        int threads = 8;
-        long count = KlikState.parallelEnumerate(graph, size, size, threads, null);
+
+        stopwatch.reset().start();
+        graph = PrunedGraph.buildFromEdgeListFile(graph_path);
+        System.out.println(graph.getInfo());
+        System.out.println("Took:" + stopwatch);
+        stopwatch.reset().start();
+        count = KlikState.parallelEnumerate(new PrunedKlikStateMan(), graph, size, size, threads, null);
         System.out.printf("%,d\n", count);
         System.out.println("Took:" + stopwatch);
 

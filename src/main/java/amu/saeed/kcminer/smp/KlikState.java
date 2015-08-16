@@ -12,19 +12,10 @@ public class KlikState {
     int[] extension = null;
     int extSize = 0;
 
-
-    private KlikState() {
+    protected KlikState() {
     }
 
-    public KlikState(int v, int[] neighbors) {
-        subgraph = new int[]{v};
-        extension = new int[neighbors.length];
-        for (int i = 0; i < neighbors.length; i++)
-            if (neighbors[i] > v)
-                extension[extSize++] = neighbors[i];
-    }
-
-    public static KlikState fromInts(int[] array) {
+    final public static KlikState fromInts(int[] array) {
         int index = 0;
         KlikState state = new KlikState();
 
@@ -38,8 +29,8 @@ public class KlikState {
         return state;
     }
 
-    public static long parallelEnumerate(final Graph g, final int lower, final int k,
-                                         final int thread_count, final String path)
+    static final public long parallelEnumerate(final KlikStateMan klikStateMan, final Graph g, final int lower, final int k,
+                                               final int thread_count, final String path)
             throws IOException, InterruptedException {
         final int flushLimit = 1024 * 1024;
         final Object lock = new Object();
@@ -64,7 +55,7 @@ public class KlikState {
                         if (v == null)
                             break;
                         ArrayList<KlikState> list = new ArrayList<KlikState>();
-                        list.add(new KlikState(v, g.getNeighbors(v)));
+                        list.add(klikStateMan.makeNew(v, g.getNeighbors(v)));
                         while (!list.isEmpty()) {
                             KlikState state = list.get(list.size() - 1);
                             list.remove(list.size() - 1);
@@ -84,7 +75,7 @@ public class KlikState {
                             int w = 0;
                             for (int i = 0; i < state.extSize; i++) {
                                 w = state.extension[i];
-                                KlikState new_state = state.expand(w, g.getNeighbors(w));
+                                KlikState new_state = klikStateMan.expand(state, w, g.getNeighbors(w));
                                 if (new_state.subgraph.length + new_state.extSize >= lower)
                                     list.add(new_state);
                             }
@@ -114,33 +105,7 @@ public class KlikState {
         return counter.get();
     }
 
-    public final KlikState expand(int w, int[] w_neighbors) {
-        KlikState newState = new KlikState();
-        newState.subgraph = new int[subgraph.length + 1];
-        System.arraycopy(subgraph, 0, newState.subgraph, 0, subgraph.length);
-        newState.subgraph[subgraph.length] = w;
-        newState.extension = new int[extSize];
-        makeNewExt(newState, w, w_neighbors);
-        return newState;
-    }
-
-    private final void makeNewExt(KlikState newState, int w, int[] w_neighbors) {
-        int i = 0, j = 0;
-        while (i < extSize && j < w_neighbors.length) {
-            if (extension[i] < w_neighbors[j])
-                i++;
-            else if (extension[i] > w_neighbors[j])
-                j++;
-            else {
-                if (extension[i] > w)
-                    newState.extension[newState.extSize++] = extension[i];
-                i++;
-                j++;
-            }
-        }
-    }
-
-    public String toString() {
+    final public String toString() {
         StringBuilder b = new StringBuilder();
         b.append('[');
         if (subgraph.length == 0)
@@ -201,6 +166,12 @@ public class KlikState {
                 }
                 sb.append('\t');
             }
+    }
+
+    public interface KlikStateMan {
+        KlikState makeNew(int v, int[] neighbors);
+
+        KlikState expand(KlikState state, int w, int[] w_neighbors);
     }
 
 
