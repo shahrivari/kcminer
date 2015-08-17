@@ -1,16 +1,16 @@
 package amu.saeed.kcminer.smp;
 
-public class PrunedKlikStateMan implements KlikState.KlikStateMan {
-    final public KlikState makeNew(int v, int[] neighbors) {
-        KlikState state = new KlikState();
+public class PrunedCliqueStateManager implements CliqueState.CliqueStateManager {
+    final public CliqueState makeNew(int v, int[] neighbors) {
+        CliqueState state = new CliqueState();
         state.subgraph = new int[]{v};
         state.extension = neighbors.clone();
         state.extSize = state.extension.length;
         return state;
     }
 
-    final public KlikState expand(KlikState state, int w, int[] w_neighbors) {
-        KlikState newState = new KlikState();
+    final public CliqueState expand(CliqueState state, int w, int[] w_neighbors) {
+        CliqueState newState = new CliqueState();
         newState.subgraph = new int[state.subgraph.length + 1];
         System.arraycopy(state.subgraph, 0, newState.subgraph, 0, state.subgraph.length);
         newState.subgraph[state.subgraph.length] = w;

@@ -21,7 +21,7 @@ public class Main {
         System.out.println(graph.getInfo());
         System.out.println("Took:" + stopwatch);
         stopwatch.reset().start();
-        count = KlikState.parallelEnumerate(new RawKlikStateMan(), graph, size, size, threads, null);
+        count = CliqueState.parallelEnumerate(new RawCliqueStateManager(), graph, size, threads, null);
         System.out.printf("%,d\n", count);
         System.out.println("Took:" + stopwatch);
         System.out.println("=========================");
@@ -32,9 +32,20 @@ public class Main {
         System.out.println(graph.getInfo());
         System.out.println("Took:" + stopwatch);
         stopwatch.reset().start();
-        count = KlikState.parallelEnumerate(new PrunedKlikStateMan(), graph, size, size, threads, null);
+        count = CliqueState.parallelEnumerate(new PrunedCliqueStateManager(), graph, size, threads, null);
         System.out.printf("%,d\n", count);
         System.out.println("Took:" + stopwatch);
+        System.out.println("=========================");
+
+        stopwatch.reset().start();
+        graph = PrunedGraph.buildFromEdgeListFile(graph_path);
+        System.out.println(graph.getInfo());
+        System.out.println("Took:" + stopwatch);
+        stopwatch.reset().start();
+        count = CliqueState.parallelCountRecursive(new PrunedCliqueStateManager(), graph, size, threads);
+        System.out.printf("%,d\n", count);
+        System.out.println("Took:" + stopwatch);
+
 
     }
 
