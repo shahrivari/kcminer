@@ -1,4 +1,4 @@
-package amu.saeed.kcminer.smp;
+package amu.saeed.kcminer.old;
 
 
 import com.carrotsearch.hppc.IntHashSet;
@@ -13,7 +13,7 @@ import java.util.Arrays;
 /**
  * Created by Saeed on 8/1/14.
  */
-public class PrunedGraph extends Graph {
+public class PrunedGraph extends OldGraph {
     public static PrunedGraph buildFromEdgeListFile(String path) throws IOException {
         PrunedGraph table = new PrunedGraph();
         IntObjectHashMap<IntHashSet> neighbors = new IntObjectHashMap<IntHashSet>();

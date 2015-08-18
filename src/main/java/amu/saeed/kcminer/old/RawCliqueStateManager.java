@@ -1,9 +1,9 @@
-package amu.saeed.kcminer.smp;
+package amu.saeed.kcminer.old;
 
-public class RawCliqueStateManager implements CliqueState.CliqueStateManager {
-    public CliqueState makeNew(int v, int[] neighbors) {
-        CliqueState state = new CliqueState();
-        state.subgraph = new int[]{v};
+public class RawCliqueStateManager implements OldCliqueStateManager {
+    public OldCliqueState makeNew(int v, int[] neighbors) {
+        OldCliqueState state = new OldCliqueState();
+        state.clique = new int[] {v};
         state.extension = new int[neighbors.length];
         for (int i = 0; i < neighbors.length; i++)
             if (neighbors[i] > v)
@@ -11,11 +11,11 @@ public class RawCliqueStateManager implements CliqueState.CliqueStateManager {
         return state;
     }
 
-    public CliqueState expand(CliqueState state, int w, int[] w_neighbors) {
-        CliqueState newState = new CliqueState();
-        newState.subgraph = new int[state.subgraph.length + 1];
-        System.arraycopy(state.subgraph, 0, newState.subgraph, 0, state.subgraph.length);
-        newState.subgraph[state.subgraph.length] = w;
+    public OldCliqueState expand(OldCliqueState state, int w, int[] w_neighbors) {
+        OldCliqueState newState = new OldCliqueState();
+        newState.clique = new int[state.clique.length + 1];
+        System.arraycopy(state.clique, 0, newState.clique, 0, state.clique.length);
+        newState.clique[state.clique.length] = w;
         newState.extension = new int[state.extSize];
         int i = 0, j = 0;
         while (i < state.extSize && j < w_neighbors.length) {

@@ -1,4 +1,4 @@
-package amu.saeed.kcminer.smp;
+package amu.saeed.kcminer.old;
 
 
 import com.carrotsearch.hppc.IntHashSet;
@@ -13,12 +13,12 @@ import java.util.Arrays;
 /**
  * Created by Saeed on 8/1/14.
  */
-public class Graph {
-    int[] vertices;
+public class OldGraph {
+    public int[] vertices;
     IntObjectHashMap<int[]> neighbors = new IntObjectHashMap<int[]>();
 
-    public static Graph buildFromEdgeListFile(String path) throws IOException {
-        Graph table = new Graph();
+    public static OldGraph buildFromEdgeListFile(String path) throws IOException {
+        OldGraph graph = new OldGraph();
         IntObjectHashMap<IntHashSet> neighbors = new IntObjectHashMap<IntHashSet>();
 
         BufferedReader br = new BufferedReader(new FileReader(path));
@@ -45,17 +45,17 @@ public class Graph {
             neighbors.get(dest).add(src);
         }
 
-        table.vertices = neighbors.keys().toArray();
-        Arrays.sort(table.vertices);
+        graph.vertices = neighbors.keys().toArray();
+        Arrays.sort(graph.vertices);
 
         for (IntObjectCursor<IntHashSet> c : neighbors) {
             int[] array = c.value.toArray();
             Arrays.sort(array);
-            table.neighbors.put(c.key, array);
+            graph.neighbors.put(c.key, array);
         }
 
         br.close();
-        return table;
+        return graph;
     }
 
     public int[] getNeighbors(int v) {
