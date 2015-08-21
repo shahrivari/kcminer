@@ -58,10 +58,14 @@ public class ReplicatedSpark {
         //            return res;
         //        }).count();
 
-        verticesRDD.map(t -> {
+        JavaRDD<KCliqueState> twos = verticesRDD.map(t -> {
             Graph localG = graphBroadcast.value();
-            cliqueCount.add(new KCliqueState(t, localG.getBiggerNeighbors(t), localG.getSmallerNeighbors(t))
-                .countKCliques(k, localG));
+            return new KCliqueState(t, localG.getBiggerNeighbors(t), localG.getSmallerNeighbors(t));
+        });
+
+        twos.map(t -> {
+            Graph localG = graphBroadcast.value();
+            cliqueCount.add(t.countKCliques(k, localG));
             return null;
         }).count();
 
