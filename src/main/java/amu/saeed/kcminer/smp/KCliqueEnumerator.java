@@ -1,8 +1,7 @@
 package amu.saeed.kcminer.smp;
 
-import amu.saeed.kcminer.old.OldCliqueState;
-import amu.saeed.kcminer.old.OldCliqueStateManager;
-import amu.saeed.kcminer.old.OldGraph;
+import amu.saeed.kcminer.graph.Graph;
+import amu.saeed.kcminer.graph.KCliqueState;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -13,13 +12,13 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Created by Saeed on 8/18/2015.
  */
-public class CliqueEnumerator {
-    static final int flushLimit = 1024 * 1024;
+public class KCliqueEnumerator {
+    static int flushLimit = 1024 * 1024;
 
-    final public static long parallelCount(final OldCliqueStateManager cliqueMan, final OldGraph graph, final int k,
-        final int thread_count) {
+    final public static long parallelTurboCount(final Graph graph, final int k, final int thread_count) {
         final AtomicLong counter = new AtomicLong();
         final ConcurrentLinkedQueue<Integer> cq = new ConcurrentLinkedQueue<Integer>();
+
         for (int v : graph.vertices)
             cq.add(v);
 
@@ -31,8 +30,8 @@ public class CliqueEnumerator {
                         Integer v = cq.poll();
                         if (v == null)
                             break;
-                        counter.addAndGet(
-                            cliqueMan.makeNew(v, graph.getNeighbors(v)).countCliquesRecursive(k, graph, cliqueMan));
+                        counter.addAndGet(new KCliqueState(v, graph.getBiggerNeighbors(v), graph.getSmallerNeighbors(v))
+                            .countKCliques(k, graph));
                     }
                 }
             });
@@ -50,8 +49,9 @@ public class CliqueEnumerator {
         return counter.get();
     }
 
-    static final public long parallelEnumerate(final OldCliqueStateManager cliqueMan, final OldGraph graph, final int k,
-        final int thread_count, final String path) throws IOException {
+
+    static final public long parallelEnumerate(final Graph graph, final int k, final int thread_count,
+        final String path) throws IOException {
         final Object lock = new Object();
 
         final AtomicLong counter = new AtomicLong();
@@ -73,10 +73,10 @@ public class CliqueEnumerator {
                         Integer v = cq.poll();
                         if (v == null)
                             break;
-                        ArrayList<OldCliqueState> list = new ArrayList<OldCliqueState>();
-                        list.add(cliqueMan.makeNew(v, graph.getNeighbors(v)));
+                        ArrayList<KCliqueState> list = new ArrayList<KCliqueState>();
+                        list.add(new KCliqueState(v, graph.getBiggerNeighbors(v), graph.getSmallerNeighbors(v)));
                         while (!list.isEmpty()) {
-                            OldCliqueState state = list.get(list.size() - 1);
+                            KCliqueState state = list.get(list.size() - 1);
                             list.remove(list.size() - 1);
                             if (state.clique.length == k - 1) {
                                 counter.getAndAdd(state.extSize);
@@ -97,7 +97,7 @@ public class CliqueEnumerator {
                             int w = 0;
                             for (int i = 0; i < state.extSize; i++) {
                                 w = state.extension[i];
-                                OldCliqueState new_state = cliqueMan.expand(state, w, graph.getNeighbors(w));
+                                KCliqueState new_state = state.expand(w, graph.getBiggerNeighbors(w));
                                 if (new_state.clique.length + new_state.extSize >= k)
                                     list.add(new_state);
                             }

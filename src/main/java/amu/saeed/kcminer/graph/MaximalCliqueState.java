@@ -2,16 +2,16 @@ package amu.saeed.kcminer.graph;
 
 import java.util.Arrays;
 
-public class CliqueState {
+public class MaximalCliqueState {
     public int[] clique = null;
     public int[] extension = null;
     public int[] tabu = null;
     public int extSize = 0;
     public int tabuSize = 0;
 
-    private CliqueState() {}
+    private MaximalCliqueState() {}
 
-    public CliqueState(int v, int[] bigger_neighbors, int[] smaller_neighbors) {
+    public MaximalCliqueState(int v, int[] bigger_neighbors, int[] smaller_neighbors) {
         clique = new int[] {v};
         extension = bigger_neighbors.clone();
         extSize = extension.length;
@@ -19,9 +19,9 @@ public class CliqueState {
         tabuSize = tabu.length;
     }
 
-    final public static CliqueState fromIntArray(int[] array) {
+    final public static MaximalCliqueState fromIntArray(int[] array) {
         int index = 0;
-        CliqueState state = new CliqueState();
+        MaximalCliqueState state = new MaximalCliqueState();
 
         int count = array[index++];
         state.clique = Arrays.copyOfRange(array, index, index + count);
@@ -38,29 +38,8 @@ public class CliqueState {
         return state;
     }
 
-    final public CliqueState expandFixed(int w, int[] wBiggerNeighbors) {
-        CliqueState newState = new CliqueState();
-        newState.clique = new int[clique.length + 1];
-        System.arraycopy(clique, 0, newState.clique, 0, clique.length);
-        newState.clique[clique.length] = w;
-        newState.extension = new int[extSize];
-        int i = 0, j = 0;
-        while (i < extSize && j < wBiggerNeighbors.length) {
-            if (extension[i] < wBiggerNeighbors[j])
-                i++;
-            else if (extension[i] > wBiggerNeighbors[j])
-                j++;
-            else {
-                newState.extension[newState.extSize++] = extension[i];
-                i++;
-                j++;
-            }
-        }
-        return newState;
-    }
-
-    final public CliqueState expandMaximal(int w, int[] wBiggerNeighbors, int[] wSmallerNeighbors) {
-        CliqueState newState = new CliqueState();
+    final public MaximalCliqueState expand(int w, int[] wBiggerNeighbors, int[] wSmallerNeighbors) {
+        MaximalCliqueState newState = new MaximalCliqueState();
         newState.clique = new int[clique.length + 1];
         System.arraycopy(clique, 0, newState.clique, 0, clique.length);
         newState.clique[clique.length] = w;
@@ -95,23 +74,6 @@ public class CliqueState {
         return newState;
     }
 
-    final public long countFixedCliques(final int k, final Graph graph) {
-        long cliqueCount = 0;
-        if (clique.length == k)
-            cliqueCount = 1L;
-        else if (clique.length == k - 1)
-            cliqueCount = extSize;
-        else {
-            int w;
-            for (int i = 0; i < extSize; i++) {
-                w = extension[i];
-                CliqueState new_state = expandFixed(w, graph.getBiggerNeighbors(w));
-                if (new_state.clique.length + new_state.extSize >= k)
-                    cliqueCount += new_state.countFixedCliques(k, graph);
-            }
-        }
-        return cliqueCount;
-    }
 
     final public long countMaximalCliques(final int k, final Graph graph) {
         long cliqueCount = 0;
@@ -122,7 +84,7 @@ public class CliqueState {
             int w;
             for (int i = 0; i < extSize; i++) {
                 w = extension[i];
-                CliqueState new_state = expandMaximal(w, graph.getBiggerNeighbors(w), graph.getSmallerNeighbors(w));
+                MaximalCliqueState new_state = expand(w, graph.getBiggerNeighbors(w), graph.getSmallerNeighbors(w));
                 if (new_state.clique.length + new_state.extSize >= k)
                     cliqueCount += new_state.countMaximalCliques(k, graph);
             }

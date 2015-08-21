@@ -7,16 +7,17 @@ import com.carrotsearch.hppc.cursors.IntObjectCursor;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Arrays;
+import java.util.HashMap;
 
 /**
  * Created by Saeed on 8/18/2015.
  */
-public class Graph {
+public class Graph implements Serializable {
     public int[] vertices;
-    IntObjectHashMap<int[]> biggerNeighbors = new IntObjectHashMap<int[]>();
-    IntObjectHashMap<int[]> smallerNeighbors = new IntObjectHashMap<int[]>();
-
+    HashMap<Integer, int[]> biggerNeighbors = new HashMap<>();
+    HashMap<Integer, int[]> smallerNeighbors = new HashMap<>();
     public static Graph buildFromEdgeListFile(String path) throws IOException {
         Graph graph = new Graph();
         IntObjectHashMap<IntHashSet> largerNeighbors = new IntObjectHashMap<IntHashSet>();
@@ -86,8 +87,12 @@ public class Graph {
 
     protected int edgeCount() {
         int edges = 0;
-        for (IntObjectCursor<int[]> x : biggerNeighbors)
-            edges += x.value.length;
+        //        for (IntObjectCursor<int[]> x : biggerNeighbors)
+        for (int[] neighbors : biggerNeighbors.values())
+            edges += neighbors.length;
+
+        //       for(long x:biggerNeighbors.entrySet())
+        //            edges += x.value.length;
         return edges;
     }
 

@@ -1,7 +1,4 @@
-package amu.saeed.kcminer.smp;
-
-import amu.saeed.kcminer.graph.CliqueState;
-import amu.saeed.kcminer.graph.Graph;
+package amu.saeed.kcminer.old;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -12,10 +9,11 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Created by Saeed on 8/18/2015.
  */
-public class NewCliqueEnumerator {
+public class CliqueEnumerator {
     static final int flushLimit = 1024 * 1024;
 
-    final public static long parallelCountFixed(final Graph graph, final int k, final int thread_count) {
+    final public static long parallelCount(final OldCliqueStateManager cliqueMan, final OldGraph graph, final int k,
+        final int thread_count) {
         final AtomicLong counter = new AtomicLong();
         final ConcurrentLinkedQueue<Integer> cq = new ConcurrentLinkedQueue<Integer>();
         for (int v : graph.vertices)
@@ -29,8 +27,8 @@ public class NewCliqueEnumerator {
                         Integer v = cq.poll();
                         if (v == null)
                             break;
-                        counter.addAndGet(new CliqueState(v, graph.getBiggerNeighbors(v), graph.getSmallerNeighbors(v))
-                            .countFixedCliques(k, graph));
+                        counter.addAndGet(
+                            cliqueMan.makeNew(v, graph.getNeighbors(v)).countCliquesRecursive(k, graph, cliqueMan));
                     }
                 }
             });
@@ -48,43 +46,8 @@ public class NewCliqueEnumerator {
         return counter.get();
     }
 
-
-    final public static long parallelCountMaximal(final Graph graph, final int k, final int thread_count) {
-        final AtomicLong counter = new AtomicLong();
-        final ConcurrentLinkedQueue<Integer> cq = new ConcurrentLinkedQueue<Integer>();
-        for (int v : graph.vertices)
-            cq.add(v);
-
-        Thread[] threads = new Thread[thread_count];
-        for (int i = 0; i < threads.length; i++) {
-            threads[i] = new Thread(new Runnable() {
-                public void run() {
-                    while (!cq.isEmpty()) {
-                        Integer v = cq.poll();
-                        if (v == null)
-                            break;
-                        counter.addAndGet(new CliqueState(v, graph.getBiggerNeighbors(v), graph.getSmallerNeighbors(v))
-                            .countMaximalCliques(k, graph));
-                    }
-                }
-            });
-            threads[i].start();
-        }
-
-        for (int i = 0; i < threads.length; i++) {
-            try {
-                threads[i].join();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-                System.exit(-1);
-            }
-        }
-        return counter.get();
-    }
-
-
-    static final public long parallelEnumerateFixed(final Graph graph, final int k, final int thread_count,
-        final String path) throws IOException {
+    static final public long parallelEnumerate(final OldCliqueStateManager cliqueMan, final OldGraph graph, final int k,
+        final int thread_count, final String path) throws IOException {
         final Object lock = new Object();
 
         final AtomicLong counter = new AtomicLong();
@@ -106,10 +69,10 @@ public class NewCliqueEnumerator {
                         Integer v = cq.poll();
                         if (v == null)
                             break;
-                        ArrayList<CliqueState> list = new ArrayList<CliqueState>();
-                        list.add(new CliqueState(v, graph.getBiggerNeighbors(v), graph.getSmallerNeighbors(v)));
+                        ArrayList<OldCliqueState> list = new ArrayList<OldCliqueState>();
+                        list.add(cliqueMan.makeNew(v, graph.getNeighbors(v)));
                         while (!list.isEmpty()) {
-                            CliqueState state = list.get(list.size() - 1);
+                            OldCliqueState state = list.get(list.size() - 1);
                             list.remove(list.size() - 1);
                             if (state.clique.length == k - 1) {
                                 counter.getAndAdd(state.extSize);
@@ -130,7 +93,7 @@ public class NewCliqueEnumerator {
                             int w = 0;
                             for (int i = 0; i < state.extSize; i++) {
                                 w = state.extension[i];
-                                CliqueState new_state = state.expandFixed(w, graph.getBiggerNeighbors(w));
+                                OldCliqueState new_state = cliqueMan.expand(state, w, graph.getNeighbors(w));
                                 if (new_state.clique.length + new_state.extSize >= k)
                                     list.add(new_state);
                             }
