@@ -1,6 +1,8 @@
 package amu.saeed.kcminer.graph;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class KCliqueState {
     public int[] clique = null;
@@ -9,7 +11,7 @@ public class KCliqueState {
 
     private KCliqueState() {}
 
-    public KCliqueState(int v, int[] bigger_neighbors, int[] smaller_neighbors) {
+    public KCliqueState(int v, int[] bigger_neighbors) {
         clique = new int[] {v};
         extension = bigger_neighbors.clone();
         extSize = extension.length;
@@ -48,6 +50,16 @@ public class KCliqueState {
             }
         }
         return newState;
+    }
+
+    final public List<KCliqueState> getChildren(final Graph graph) {
+        ArrayList<KCliqueState> children = new ArrayList();
+        for (int i = 0; i < extSize; i++) {
+            int w = extension[i];
+            KCliqueState new_state = expand(w, graph.getBiggerNeighbors(w));
+            children.add(new_state);
+        }
+        return children;
     }
 
     final public long countKCliques(final int k, final Graph graph) {

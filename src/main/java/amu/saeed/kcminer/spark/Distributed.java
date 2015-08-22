@@ -12,11 +12,12 @@ import org.apache.spark.broadcast.Broadcast;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 /**
  * Created by Saeed on 8/21/2015.
  */
-public class ReplicatedSpark {
+public class Distributed {
     public static void main(String[] args) throws IOException {
         String appName = "Replicated KCMiner";
         SparkConf conf = new SparkConf().setAppName(appName);
@@ -24,7 +25,7 @@ public class ReplicatedSpark {
         conf.set("spark.akka.frameSize", "128");
         conf.set("spark.executor.extraJavaOptions",
             "-XX:+UseParallelGC -XX:+UseParallelOldGC " + "-XX:ParallelGCThreads=3 -XX:MaxGCPauseMillis=100");
-        conf.set("spark.storage.memoryFraction", "0.1");
+        conf.set("spark.storage.memoryFraction", "0.33");
         conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
 
 
@@ -40,30 +41,29 @@ public class ReplicatedSpark {
         Stopwatch stopwatch = Stopwatch.createStarted();
 
         int k = Integer.parseInt(args[1]);
-        JavaRDD<Integer> verticesRDD = sc.parallelize(vertices).repartition(Integer.parseInt(args[2]));
+        int numTasks = Integer.parseInt(args[2]);
+        JavaRDD<Integer> verticesRDD = sc.parallelize(vertices).repartition(numTasks);
 
         Accumulator<Long> cliqueCount = LongAccumolator.create();
 
-        //        verticesRDD.mapPartitions(t -> {
-        //            Graph localG = graphBroadcast.value();
-        //            long localcount = 0;
-        //            while (t.hasNext()) {
-        //                int v=t.next();
-        //                localcount += new KCliqueState(v, graph.getBiggerNeighbors(v), graph.getSmallerNeighbors(v))
-        //                    .countKCliques(k, graph);
-        //            }
-        //            cliqueCount.add(localcount);
-        //            ArrayList<Long> res = new ArrayList<Long>();
-        //            res.add(localcount);
-        //            return res;
-        //        }).count();
-
-        JavaRDD<KCliqueState> twos = verticesRDD.map(t -> {
+        JavaRDD<KCliqueState> twos = verticesRDD.flatMap(t -> {
             Graph localG = graphBroadcast.value();
-            return new KCliqueState(t, localG.getBiggerNeighbors(t), localG.getSmallerNeighbors(t));
-        });
+            KCliqueState oneClique = new KCliqueState(t, localG.getBiggerNeighbors(t));
+            return oneClique.getChildren(localG);
+        }).repartition(numTasks);
 
-        twos.map(t -> {
+
+        JavaRDD<KCliqueState> threes = twos.flatMap(t -> {
+            ArrayList<KCliqueState> result = new ArrayList();
+            Graph localG = graphBroadcast.value();
+            List<KCliqueState> threeStates = t.getChildren(localG);
+            for (KCliqueState threeState : threeStates)
+                if (threeState.clique.length + threeState.extSize >= k)
+                    result.add(threeState);
+            return result;
+        }).repartition(numTasks);
+
+        threes.map(t -> {
             Graph localG = graphBroadcast.value();
             cliqueCount.add(t.countKCliques(k, localG));
             return null;

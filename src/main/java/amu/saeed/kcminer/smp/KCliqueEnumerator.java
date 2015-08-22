@@ -30,7 +30,7 @@ public class KCliqueEnumerator {
                         Integer v = cq.poll();
                         if (v == null)
                             break;
-                        counter.addAndGet(new KCliqueState(v, graph.getBiggerNeighbors(v), graph.getSmallerNeighbors(v))
+                        counter.addAndGet(new KCliqueState(v, graph.getBiggerNeighbors(v))
                             .countKCliques(k, graph));
                     }
                 }
@@ -74,7 +74,7 @@ public class KCliqueEnumerator {
                         if (v == null)
                             break;
                         ArrayList<KCliqueState> list = new ArrayList<KCliqueState>();
-                        list.add(new KCliqueState(v, graph.getBiggerNeighbors(v), graph.getSmallerNeighbors(v)));
+                        list.add(new KCliqueState(v, graph.getBiggerNeighbors(v)));
                         while (!list.isEmpty()) {
                             KCliqueState state = list.get(list.size() - 1);
                             list.remove(list.size() - 1);
