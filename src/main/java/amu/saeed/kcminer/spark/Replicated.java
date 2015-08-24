@@ -46,21 +46,6 @@ public class Replicated {
 
         Accumulator<Long> cliqueCount = LongAccumolator.create();
 
-        //        verticesRDD.mapPartitions(t -> {
-        //            Graph localG = graphBroadcast.value();
-        //            long localcount = 0;
-        //            while (t.hasNext()) {
-        //                int v=t.next();
-        //                localcount += new KCliqueState(v, graph.getBiggerNeighbors(v), graph.getSmallerNeighbors(v))
-        //                    .countKCliques(k, graph);
-        //            }
-        //            cliqueCount.add(localcount);
-        //            ArrayList<Long> res = new ArrayList<Long>();
-        //            res.add(localcount);
-        //            return res;
-        //        }).count();
-
-
         JavaRDD<KCliqueState> twos = verticesRDD.flatMap(t -> {
             Graph localG = graphBroadcast.value();
             KCliqueState oneClique = new KCliqueState(t, localG.getBiggerNeighbors(t));
