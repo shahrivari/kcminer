@@ -12,6 +12,7 @@ import scala.Tuple2;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 
 /**
@@ -50,57 +51,62 @@ public class Iterative {
 
         JavaPairRDD<Integer, int[]> biggerNeighbors = edges.groupByKey().mapToPair(t -> {
             int v = t._1;
-            List<Integer> bigs = new ArrayList();
+            HashSet<Integer> bigs = new HashSet<Integer>();
             for (Integer w : t._2)
                 if (w > v)
                     bigs.add(w);
             int[] array = new int[bigs.size()];
-            for (int i = 0; i < bigs.size(); i++)
-                array[i] = bigs.get(i);
+            int i = 0;
+            for (Integer big : bigs)
+                array[i++] = big;
             Arrays.sort(array);
             return new Tuple2<Integer, int[]>(v, array);
         }).repartition(numTasks);
 
 
-        long actual = biggerNeighbors.count();
+        //        long actual = biggerNeighbors.count();
+        //
+        //        JavaPairRDD<Integer, int[]> mis =
+        //            biggerNeighbors.filter(t -> !Arrays.equals(graph.getBiggerNeighbors(t._1), t._2));
+        //
+        //        List<Tuple2<Integer, int[]>> khar = mis.collect();
+        //
 
-        JavaRDD<Integer> mis =
-            biggerNeighbors.map(t -> Arrays.equals(graph.getBiggerNeighbors(t._1), t._2) == true ? 1 : 0);
-
-        long msc = mis.count();
 
         JavaRDD<KCliqueState> states = biggerNeighbors.map(t -> new KCliqueState(t._1, t._2)).repartition(numTasks);
 
-        long count = states.count();
-        System.out.printf("Total cliques of size %d => %,d \n", k, count);
-
-
-        JavaPairRDD<Integer, KCliqueState> readyToExpand = states.flatMapToPair(t -> {
-            List<Tuple2<Integer, KCliqueState>> list = new ArrayList();
-            for (int i = 0; i < t.extSize; i++)
-                list.add(new Tuple2(t.extension[i], t));
-            return list;
-        });
-
-        JavaPairRDD<Integer, Tuple2<KCliqueState, int[]>> joined = readyToExpand.join(biggerNeighbors, numTasks);
-        states = joined.map(t -> t._2._1.expand(t._1, t._2._2)).filter(t -> t != null);
-
-        count = states.count();
-        System.out.printf("Total cliques of size %d => %,d \n", k, count);
-
-
-
-        //                for(int iter=2;iter<k;iter++){
-        //            JavaPairRDD<Integer, KCliqueState> readyToExpand = states.flatMapToPair(t -> {
-        //                List<Tuple2<Integer, KCliqueState>> list = new ArrayList();
-        //                for (int i = 0; i < t.extSize; i++)
-        //                    list.add(new Tuple2(t.extension[i], t));
-        //                return list;
-        //            });
-        //            JavaPairRDD<Integer, Tuple2<KCliqueState, int[]>> joined = readyToExpand.join(biggerNeighbors,
+        //        long count = states.count();
+        //        System.out.printf("Total cliques of size %d => %,d \n", k, count);
+        //
+        //
+        //        JavaPairRDD<Integer, KCliqueState> readyToExpand = states.flatMapToPair(t -> {
+        //            List<Tuple2<Integer, KCliqueState>> list = new ArrayList();
+        //            for (int i = 0; i < t.extSize; i++)
+        //                list.add(new Tuple2(t.extension[i], t));
+        //            return list;
+        //        });
+        //
+        //        JavaPairRDD<Integer, Tuple2<KCliqueState, int[]>> joined = readyToExpand.join(biggerNeighbors,
         // numTasks);
-        //            states=joined.map(t -> t._2._1.expand(t._1,t._2._2)).filter(t->t!=null);
-        //        }
+        //        states = joined.map(t -> t._2._1.expand(t._1, t._2._2)).filter(t -> t != null);
+        //
+        //        count = states.count();
+        //        System.out.printf("Total cliques of size %d => %,d \n", k, count);
+
+
+
+        for (int iter = 2; iter < k; iter++) {
+            JavaPairRDD<Integer, KCliqueState> readyToExpand = states.flatMapToPair(t -> {
+                List<Tuple2<Integer, KCliqueState>> list = new ArrayList();
+                for (int i = 0; i < t.extSize; i++)
+                    list.add(new Tuple2(t.extension[i], t));
+                return list;
+            });
+            JavaPairRDD<Integer, Tuple2<KCliqueState, int[]>> joined = readyToExpand.join(biggerNeighbors, numTasks);
+            states = joined.map(t -> t._2._1.expand(t._1, t._2._2)).filter(t -> t != null);
+            long count = states.count();
+            System.out.printf("Total cliques of size %d => %,d \n", iter, count);
+        }
 
 
         sc.close();

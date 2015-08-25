@@ -47,7 +47,7 @@ public class Main {
         //        System.out.printf("%,d\n", count);
         //        System.out.println("Took:" + stopwatch);
 
-        for (int k = 1; k < size; k++) {
+        for (int k = 1; k <= size; k++) {
             stopwatch.reset().start();
             System.out.println("*************************************************");
             count = KCliqueEnumerator.parallelTurboCount(ngraph, k, threads);
