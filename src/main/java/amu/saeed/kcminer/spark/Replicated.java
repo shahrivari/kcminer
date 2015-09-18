@@ -20,7 +20,7 @@ import java.util.List;
 public class Replicated {
     public static void main(String[] args) throws IOException {
         String appName = "Replicated KCMiner";
-        SparkConf conf = new SparkConf().setAppName(appName);
+        SparkConf conf = new SparkConf().setAppName(appName).setMaster("local[6]");
         conf.set("spark.executor.memory", "16g");
         conf.set("spark.akka.frameSize", "128");
         conf.set("spark.executor.extraJavaOptions",
