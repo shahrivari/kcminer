@@ -5,7 +5,6 @@ import com.google.common.base.Stopwatch;
 import org.apache.spark.Accumulator;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
-import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import scala.Tuple2;
 
@@ -68,15 +67,16 @@ public class TriangleCounter {
             return new Tuple2<>(v, array);
         }).repartition(numTasks);
 
+        biggerNeighbors.cache();
 
-        JavaRDD<KCliqueState> states = biggerNeighbors.map(t -> new KCliqueState(t._1, t._2));
-
-        JavaPairRDD<Integer, KCliqueState> readyToExpand = states.flatMapToPair(t -> {
+        JavaPairRDD<Integer, KCliqueState> readyToExpand = biggerNeighbors.flatMapToPair(t -> {
+            KCliqueState state = new KCliqueState(t._1, t._2);
             List<Tuple2<Integer, KCliqueState>> list = new ArrayList();
-            for (int i = 0; i < t.extSize; i++)
-                list.add(new Tuple2(t.extension[i], t));
+            for (int i = 0; i < state.extSize; i++)
+                list.add(new Tuple2(state.extension[i], state));
             return list;
-        }).repartition(numTasks);
+        });
+
 
         readyToExpand.cogroup(biggerNeighbors, numTasks).map(t -> {
             int w = t._1;
