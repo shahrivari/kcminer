@@ -44,7 +44,7 @@ public class Distributed {
         int numTasks = Integer.parseInt(args[2]);
         JavaRDD<Integer> verticesRDD = sc.parallelize(vertices).repartition(numTasks);
 
-        Accumulator<Long> cliqueCount = LongAccumolator.create();
+        Accumulator<Long> cliqueCount = LongAccumulator.create();
 
         JavaRDD<KCliqueState> twos = verticesRDD.flatMap(t -> {
             Graph localG = graphBroadcast.value();

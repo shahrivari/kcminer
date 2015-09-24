@@ -6,9 +6,9 @@ import org.apache.spark.AccumulatorParam;
 /**
  * Created by saeed on 6/10/15.
  */
-public class LongAccumolator implements AccumulatorParam<Long> {
+public class LongAccumulator implements AccumulatorParam<Long> {
     public static Accumulator<Long> create() {
-        return new Accumulator<Long>(0L, new LongAccumolator());
+        return new Accumulator<Long>(0L, new LongAccumulator());
     }
 
     @Override public Long addAccumulator(Long aLong, Long aLong2) {
