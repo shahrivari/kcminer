@@ -2,13 +2,15 @@ package amu.saeed.kcminer.spark;
 
 import amu.saeed.kcminer.graph.KCliqueState;
 import com.google.common.base.Stopwatch;
-import com.google.common.hash.Hashing;
 import org.apache.spark.Accumulator;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.storage.StorageLevel;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
+import org.kohsuke.args4j.Option;
 import scala.Tuple2;
 
 import java.io.IOException;
@@ -17,43 +19,51 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 
-public class IterativeCounter {
+public class Iterative {
     public static void main(String[] args) throws IOException {
         String appName = "Iterative KCMiner";
         SparkConf conf = new SparkConf().setAppName(appName);
         SparkConfigurator.config(conf);
         conf.registerKryoClasses(new Class[] {Tuple2.class, Integer.class});
 
-        for (String arg : args)
-            if (arg.toLowerCase().equals("local")) conf.setMaster("local[8]");
+        Params params = new Params();
+        try {
+            new CmdLineParser(params).parseArgument(args);
+        } catch (CmdLineException e) {
+            System.err.println(e.getMessage());
+            new CmdLineParser(params).printUsage(System.err);
+            return;
+        }
 
-        String input = args[0];
-        int k = Integer.parseInt(args[1]);
-        int numTasks = Integer.parseInt(args[2]);
+        if (params.local)
+            conf.setMaster("local[8]");
+
 
         JavaSparkContext sc = new JavaSparkContext(conf);
         Stopwatch stopwatch = Stopwatch.createStarted();
-        final Accumulator<Long>[] counts = new Accumulator[k + 1];
+        final Accumulator<Long>[] counts = new Accumulator[params.k + 1];
         for (int i = 0; i < counts.length; i++)
             counts[i] = LongAccumulator.create();
 
-        JavaPairRDD<Integer, Integer> edges = sc.textFile(input).flatMapToPair(t -> {
+        JavaPairRDD<Integer, Integer> edges = sc.textFile(params.inputPath).flatMapToPair(t -> {
             List<Tuple2<Integer, Integer>> list = new ArrayList();
-            if (t.startsWith("#")) return list;
+            if (t.startsWith("#"))
+                return list;
             String[] tokens = t.split("\\s+");
             int src = Integer.parseInt(tokens[0]);
             int dest = Integer.parseInt(tokens[1]);
             list.add(new Tuple2(src, dest));
             list.add(new Tuple2(dest, src));
             return list;
-        }).repartition(numTasks);
+        }).repartition(params.graphParts);
 
         JavaPairRDD<Integer, int[]> biggerNeighbors = edges.groupByKey().mapToPair(t -> {
             counts[1].add((long) 1);
             int v = t._1;
             HashSet<Integer> bigs = new HashSet<>();
             for (Integer w : t._2)
-                if (w > v) bigs.add(w);
+                if (w > v)
+                    bigs.add(w);
             int[] array = new int[bigs.size()];
             int i = 0;
             for (Integer big : bigs)
@@ -62,31 +72,30 @@ public class IterativeCounter {
             return new Tuple2<>(v, array);
         });
 
-        biggerNeighbors = biggerNeighbors.persist(StorageLevel.MEMORY_AND_DISK());
+        biggerNeighbors = biggerNeighbors.repartition(params.graphParts).persist(StorageLevel.MEMORY_AND_DISK());
 
 
-        JavaRDD<KCliqueState> states = biggerNeighbors.map(t -> new KCliqueState(t._1, t._2)).repartition(numTasks);
+        JavaRDD<KCliqueState> states =
+            biggerNeighbors.map(t -> new KCliqueState(t._1, t._2)).repartition(params.numTasks);
 
-        for (int iter = 2; iter < k; iter++) {
+        for (int iter = 2; iter < params.k; iter++) {
             final int iteration = iter;
             states = states.flatMapToPair(x -> {
                 List<Tuple2<Integer, KCliqueState>> list = new ArrayList();
                 for (int i = 0; i < x.extSize; i++)
                     list.add(new Tuple2<>(x.extension[i], x));
                 return list;
-            }).cogroup(biggerNeighbors, numTasks).flatMap(t -> {
+            }).join(biggerNeighbors, params.numTasks).flatMap(t -> {
                 int w = t._1;
-                int[] w_neighs = t._2._2.iterator().next();
+                int[] w_neighs = t._2._2;
                 List<KCliqueState> list = new ArrayList<>();
-                for (KCliqueState state : t._2._1)
-                    list.add(state.expand(w, w_neighs));
+                list.add(t._2._1.expand(w, w_neighs));
                 counts[iteration].add((long) list.size());
                 return list;
             });
         }
 
-        long kCliques = states.map(t -> (long) t.extSize).reduce((a, b) -> a + b);
-        counts[k].setValue(kCliques);
+        counts[params.k].setValue(states.map(t -> (long) t.extSize).reduce((a, b) -> a + b));
 
         for (int i = 1; i < counts.length; i++)
             System.out.printf("Cliques of size %d => %,d\n", i, counts[i].value());
@@ -97,7 +106,12 @@ public class IterativeCounter {
 
     }
 
-    private int hash(int i, int mask) {
-        return Hashing.murmur3_32().hashInt(i).asInt() & mask;
+
+    private static class Params {
+        @Option(name = "-local", usage = "run locally") boolean local = false;
+        @Option(name = "-k", usage = "size of the cliques to mine.", required = true) int k;
+        @Option(name = "-t", usage = "number of tasks to launch", required = true) int numTasks;
+        @Option(name = "-p", usage = "number of graph partitions") int graphParts = 200;
+        @Option(name = "-i", usage = "the input path", required = true) String inputPath;
     }
 }
