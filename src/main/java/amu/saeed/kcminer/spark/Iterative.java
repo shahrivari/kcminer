@@ -96,14 +96,6 @@ public class Iterative {
                 });
             });
 
-            //            join(biggerNeighbors, params.numTasks).flatMap(t -> {
-            //                int w = t._1;
-            //                int[] w_neighs = t._2._2;
-            //                List<KCliqueState> list = new ArrayList<>();
-            //                list.add(t._2._1.expand(w, w_neighs));
-            //                counts[iteration].add((long) list.size());
-            //                return list;
-            //            });
         }
 
         final int k = params.k;

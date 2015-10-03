@@ -1,5 +1,8 @@
 package amu.saeed.kcminer.graph;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -8,8 +11,9 @@ public class KCliqueState {
     public int[] clique = null;
     public int[] extension = null;
     public int extSize = 0;
+    public int w = -1;
 
-    private KCliqueState() {}
+    public KCliqueState() {}
 
     public KCliqueState(int v, int[] bigger_neighbors) {
         clique = new int[] {v};
@@ -142,4 +146,28 @@ public class KCliqueState {
                 sb.append('\t');
             }
     }
+
+    public final void writeToStream(DataOutputStream dos) throws IOException {
+        dos.writeInt(clique.length);
+        for (int x : clique)
+            dos.writeInt(x);
+        dos.writeInt(extSize);
+        for (int i = 0; i < extSize; i++)
+            dos.writeInt(extension[i]);
+        dos.writeInt(w);
+    }
+
+    final public void readFromStream(DataInputStream dis) throws IOException {
+        clique = new int[dis.readInt()];
+        for (int i = 0; i < clique.length; i++)
+            clique[i] = dis.readInt();
+
+        extension = new int[dis.readInt()];
+        extSize = extension.length;
+        for (int i = 0; i < extension.length; i++)
+            extension[i] = dis.readInt();
+        w = dis.readInt();
+    }
+
+
 }

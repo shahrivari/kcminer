@@ -2,7 +2,6 @@ package amu.saeed.kcminer.spark;
 
 import amu.saeed.kcminer.graph.KCliqueState;
 import com.google.common.base.Stopwatch;
-import com.google.common.collect.Iterables;
 import com.google.common.hash.Hashing;
 import org.apache.spark.Accumulator;
 import org.apache.spark.Partitioner;
@@ -16,8 +15,7 @@ import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import scala.Tuple2;
 
-import java.io.IOException;
-import java.io.Serializable;
+import java.io.*;
 import java.util.*;
 
 public class Iterative3 {
@@ -25,7 +23,8 @@ public class Iterative3 {
         String appName = "Iterative KCMiner";
         SparkConf conf = new SparkConf().setAppName(appName);
         SparkConfigurator.config(conf);
-        conf.registerKryoClasses(new Class[] {Tuple2.class, Integer.class, UType.class, KCliqueState.class});
+        conf.registerKryoClasses(
+            new Class[] {int[].class, Tuple2.class, Integer.class, UType.class, KCliqueState.class});
 
         Params params = new Params();
         try {
@@ -57,6 +56,7 @@ public class Iterative3 {
             }
         };
 
+        // We have the edges.
         JavaPairRDD<Integer, Integer> edges = sc.textFile(params.inputPath).flatMapToPair(t -> {
             List<Tuple2<Integer, Integer>> list = new ArrayList();
             if (t.startsWith("#"))
@@ -64,11 +64,13 @@ public class Iterative3 {
             String[] tokens = t.split("\\s+");
             int src = Integer.parseInt(tokens[0]);
             int dest = Integer.parseInt(tokens[1]);
+            // put both sides to reach an undirected graph
             list.add(new Tuple2(src, dest));
             list.add(new Tuple2(dest, src));
             return list;
         }).repartition(params.graphParts);
 
+        // The bigger neighbors
         JavaPairRDD<Integer, UType> biggerNeighbors = edges.groupByKey().mapToPair(t -> {
             counts[1].add((long) 1);
             int v = t._1;
@@ -84,10 +86,15 @@ public class Iterative3 {
             return UType.fromNeighbors(v, array).toTuple();
         }).partitionBy(partitioner).persist(StorageLevel.MEMORY_AND_DISK());
 
-        JavaRDD<KCliqueState> states =
-            biggerNeighbors.map(t -> new KCliqueState(t._1, t._2.neighbors)).filter(t -> t.extSize > 0);
+        // The first states
+        JavaRDD<KCliqueState> states = biggerNeighbors.map(t -> {
+            KCliqueState state = new KCliqueState(t._1, t._2.neighbors);
+            counts[2].add((long) state.extSize);
+            return state;
+        }).filter(t -> t.extSize > 0);
 
         for (int iter = 2; iter < params.k; iter++) {
+            final int finIter = iter;
             final int iteration = iter;
             states = states.flatMapToPair(s -> {
                 List<Tuple2<Integer, UType>> list = new ArrayList();
@@ -95,26 +102,55 @@ public class Iterative3 {
                     list.add(UType.fromState(s.extension[i], s).toTuple());
                 return list;
             }).union(biggerNeighbors).partitionBy(partitioner).mapPartitions(l -> {
+                final File tmp = File.createTempFile(Integer.toString(new Random().nextInt()), "b");
+                tmp.deleteOnExit();
+                DataOutputStream dos =
+                    new DataOutputStream(new BufferedOutputStream(new FileOutputStream(tmp), 16 * 1024 * 1024));
+
                 final HashMap<Integer, int[]> neighMap = new HashMap<>();
-                final List<UType> stateList = new ArrayList<>();
+                int stateCounter = 0;
                 while (l.hasNext()) {
                     UType record = l.next()._2;
                     if (record.isNeighborList())
                         neighMap.put(record.w, record.neighbors);
-                    else
-                        stateList.add(record);
+                    else {
+                        record.state.w = record.w;
+                        record.state.writeToStream(dos);
+                        stateCounter++;
+                    }
                 }
+                dos.close();
+                final int stateCount = stateCounter;
+                return new Iterable<KCliqueState>() {
+                    DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(tmp)));
+                    int consumed = 0;
 
-                return Iterables.transform(stateList, s -> {
-                    counts[iteration].add(1L);
-                    return s.state.expand(s.w, neighMap.get(s.w));
-                });
-            }).filter(s -> s.extSize > 0);
+                    @Override public Iterator<KCliqueState> iterator() {
+                        return new Iterator<KCliqueState>() {
+                            @Override public boolean hasNext() { return consumed < stateCount; }
+
+                            @Override public KCliqueState next() {
+                                consumed++;
+                                KCliqueState state = new KCliqueState();
+                                try {
+                                    state.readFromStream(dis);
+                                    KCliqueState newState = state.expand(state.w, neighMap.get(state.w));
+                                    if (finIter == params.k - 1)
+                                        newState.extension = null;
+                                    counts[iteration + 1].add((long) newState.extSize);
+                                    return newState;
+                                } catch (IOException e) {
+                                    throw new RuntimeException("Cannot read state");
+                                }
+                            }
+                        };
+                    }
+                };
+            });
         }
 
-
-        counts[params.k].setValue(states.map(t -> (long) t.extSize).reduce((a, b) -> a + b));
-
+        // Trigger the last step!
+        states.count();
 
         for (int i = 1; i < counts.length; i++)
             System.out.printf("Cliques of size %d => %,d\n", i, counts[i].value());
