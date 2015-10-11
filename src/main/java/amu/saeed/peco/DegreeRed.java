@@ -72,11 +72,12 @@ public class DegreeRed extends Reducer<LongWritable, Text, LongWritable, Text> {
         LongWritable[] ws = new LongWritable[CAND.size()];
         CAND.toArray(ws);
 
+        HashSet<LongWritable> NCAND = new HashSet<>();
         for (LongWritable w : ws) {
-            HashSet<LongWritable> NCLIQ = new HashSet<>(CLIQ);
-            HashSet<LongWritable> NCAND = new HashSet<>(CAND);
+            NCAND.clear();
+            NCAND.addAll(CAND);
             NCAND.remove(w);
-            NCLIQ.add(w);
+            CLIQ.add(w);
 
             LinkedList<LongWritable> wNeighbors = SubGraph.get(w);
             if (wNeighbors == null)
@@ -84,7 +85,8 @@ public class DegreeRed extends Reducer<LongWritable, Text, LongWritable, Text> {
 
             NCAND.retainAll(wNeighbors);
 
-            findKCliques(NCLIQ, NCAND, context);
+            findKCliques(CLIQ, NCAND, context);
+            CLIQ.remove(w);
         }
     }
 
