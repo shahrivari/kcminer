@@ -3,6 +3,7 @@ package amu.saeed.kcminer.spark;
 import amu.saeed.kcminer.graph.KCliqueState;
 import com.google.common.base.Stopwatch;
 import com.google.common.hash.Hashing;
+import org.apache.hadoop.io.compress.GzipCodec;
 import org.apache.spark.Accumulator;
 import org.apache.spark.Partitioner;
 import org.apache.spark.SparkConf;
@@ -135,7 +136,7 @@ public class Iterative3 {
                                 try {
                                     state.readFromStream(dis);
                                     KCliqueState newState = state.expand(state.w, neighMap.get(state.w));
-                                    if (finIter == params.k - 1)
+                                    if (finIter == params.k - 1 && params.outputPath == null)
                                         newState.extension = null;
                                     counts[iteration + 1].add((long) newState.extSize);
                                     return newState;
@@ -150,14 +151,33 @@ public class Iterative3 {
         }
 
         // Trigger the last step!
-        states.count();
+        if (params.outputPath == null)
+            states.count();
+        else
+            states.flatMap(s -> {
+                List<String> cliques = new ArrayList<String>();
+
+                StringBuilder builder = new StringBuilder(s.clique.length * 2 + 10);
+                for (int i = 0; i < s.clique.length; i++)
+                    builder.append(s.clique[i]).append(',');
+                int len = builder.length();
+
+                for (int i = 0; i < s.extSize; i++) {
+                    builder.append(s.extension[i]);
+                    cliques.add(builder.toString());
+                    builder.setLength(len);
+                }
+                return cliques;
+            }).saveAsTextFile(params.outputPath, GzipCodec.class);
 
         for (int i = 1; i < counts.length; i++)
             System.out.printf("Cliques of size %d => %,d\n", i, counts[i].value());
 
+        int totalCores = sc.getConf().getInt("spark.cores.max", 0);
         sc.close();
 
-        System.out.println("Took: " + stopwatch);
+        System.out.printf("Graph:%s   Size:%d   Count:%,d   Cores:%d   Took:%s\n", params.inputPath, params.k,
+            counts[counts.length - 1].value(), totalCores, stopwatch);
     }
 
 
@@ -202,5 +222,6 @@ public class Iterative3 {
         @Option(name = "-t", usage = "number of tasks to launch", required = true) int numTasks;
         @Option(name = "-p", usage = "number of graph partitions") int graphParts = 200;
         @Option(name = "-i", usage = "the input path", required = true) String inputPath;
+        @Option(name = "-o", usage = "the output path", required = false) String outputPath = null;
     }
 }

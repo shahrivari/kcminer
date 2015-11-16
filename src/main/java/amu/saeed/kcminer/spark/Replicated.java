@@ -84,10 +84,11 @@ public class Replicated {
             return null;
         }).count();
 
+        int totalCores = sc.getConf().getInt("spark.cores.max", 0);
         sc.close();
 
-        System.out.println("Took: " + stopwatch);
-        System.out.printf("Total cliques of size %d => %,d \n", params.k, cliqueCount.value());
+        System.out.printf("Graph:%s   Size:%d   Count:%,d   Cores:%d   Took:%s\n", params.inputPath, params.k,
+            cliqueCount.value(), totalCores, stopwatch);
     }
 
     private static class Params implements Serializable {
