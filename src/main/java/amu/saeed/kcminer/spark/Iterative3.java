@@ -174,10 +174,9 @@ public class Iterative3 {
             System.out.printf("Cliques of size %d => %,d\n", i, counts[i].value());
 
         int totalCores = sc.getConf().getInt("spark.cores.max", 0);
-        sc.close();
-
         System.out.printf("Graph:%s   Size:%d   Count:%,d   Cores:%d   Took:%s\n", params.inputPath, params.k,
             counts[counts.length - 1].value(), totalCores, stopwatch);
+        sc.close();
     }
 
 
