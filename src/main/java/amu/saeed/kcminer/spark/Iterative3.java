@@ -46,16 +46,6 @@ public class Iterative3 {
         for (int i = 0; i < counts.length; i++)
             counts[i] = LongAccumulator.create();
 
-        Partitioner partitioner = new Partitioner() {
-            @Override public int numPartitions() {
-                return params.numTasks;
-            }
-
-            @Override public int getPartition(Object o) {
-                int var = (int) o;
-                return var % numPartitions() >= 0 ? var % numPartitions() : var % numPartitions() + numPartitions();
-            }
-        };
 
         // We have the edges.
         JavaPairRDD<Integer, Integer> edges = sc.textFile(params.inputPath).flatMapToPair(t -> {
@@ -85,7 +75,7 @@ public class Iterative3 {
                 array[i++] = big;
             Arrays.sort(array);
             return UType.fromNeighbors(v, array).toTuple();
-        }).partitionBy(partitioner).persist(StorageLevel.MEMORY_AND_DISK());
+        }).repartition(params.numTasks).persist(StorageLevel.MEMORY_AND_DISK());
 
         // The first states
         JavaRDD<KCliqueState> states = biggerNeighbors.map(t -> {
@@ -93,6 +83,25 @@ public class Iterative3 {
             counts[2].add((long) state.extSize);
             return state;
         }).filter(t -> t.extSize > 0);
+
+        Partitioner partitioner = new Partitioner() {
+            @Override public int numPartitions() {
+                return params.numTasks;
+            }
+
+            @Override public int getPartition(Object o) {
+                int var = (int) o;
+                int hash = var * 0x9E3779B9;
+                hash = hash ^ (hash >> 16);
+                int bucket = hash % numPartitions();
+                if (bucket < 0)
+                    bucket += numPartitions();
+                return bucket;
+                //return var % numPartitions() >= 0 ? var % numPartitions() : var % numPartitions() + numPartitions();
+            }
+        };
+
+
 
         for (int iter = 2; iter < params.k; iter++) {
             final int finIter = iter;
