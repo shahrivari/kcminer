@@ -17,6 +17,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Created by Saeed on 8/21/2015.
@@ -36,37 +37,36 @@ public class Replicated {
         String appName = "Replicated KCMiner";
         SparkConf conf = new SparkConf().setAppName(appName);
         if (params.local)
-            conf.setMaster("local[6]");
+            conf.setMaster("local[8]");
         conf.set("spark.executor.memory", "16g");
         conf.set("spark.akka.frameSize", "128");
-        conf.set("spark.executor.extraJavaOptions",
-            "-XX:+UseParallelGC -XX:+UseParallelOldGC " + "-XX:ParallelGCThreads=3 -XX:MaxGCPauseMillis=100");
+        //        conf.set("spark.executor.extraJavaOptions",
+        //            "-XX:+UseParallelGC -XX:+UseParallelOldGC " + "-XX:ParallelGCThreads=3 -XX:MaxGCPauseMillis=100");
         conf.set("spark.storage.memoryFraction", "0.1");
         conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
 
         JavaSparkContext sc = new JavaSparkContext(conf);
-
+        Accumulator<Long> cliqueCount = LongAccumulator.create();
 
         Graph graph = Graph.buildFromEdgeListFile(params.inputPath);
         final Broadcast<Graph> graphBroadcast = sc.broadcast(graph);
         ArrayList<Integer> vertices = new ArrayList(graph.vertices.length);
         for (int v : graph.vertices)
             vertices.add(v);
-
         Collections.shuffle(vertices);
 
         Stopwatch stopwatch = Stopwatch.createStarted();
 
-        JavaRDD<Integer> verticesRDD = sc.parallelize(vertices).repartition(params.graphParts);
-
-        Accumulator<Long> cliqueCount = LongAccumulator.create();
-
-        JavaRDD<KCliqueState> twos = verticesRDD.flatMap(t -> {
-            Graph localG = graphBroadcast.value();
-            KCliqueState oneClique = new KCliqueState(t, localG.getBiggerNeighbors(t));
-            return oneClique.getChildren(localG);
-        }).repartition(params.graphParts);
-
+        JavaRDD<KCliqueState> twos;
+        if (vertices.size() > 100_000)
+            twos = sc.parallelize(vertices.stream().parallel().flatMap(
+                t -> new KCliqueState(t, graphBroadcast.value().getBiggerNeighbors(t))
+                    .getChildren(graphBroadcast.value()).stream()).collect(Collectors.toList()));
+        else
+            twos = sc.parallelize(vertices).flatMap(t -> {
+                KCliqueState oneClique = new KCliqueState(t, graphBroadcast.value().getBiggerNeighbors(t));
+                return oneClique.getChildren(graphBroadcast.value());
+            }).repartition(params.graphParts);
 
         JavaRDD<KCliqueState> threes = twos.flatMap(t -> {
             ArrayList<KCliqueState> result = new ArrayList();
@@ -96,6 +96,7 @@ public class Replicated {
         @Option(name = "-t", usage = "number of tasks to launch", required = true) int numTasks;
         @Option(name = "-p", usage = "number of graph partitions") int graphParts = 200;
         @Option(name = "-i", usage = "the input path", required = true) String inputPath;
+        @Option(name = "-f", usage = "fast initialization") boolean fastInitialization = false;
     }
 
 }

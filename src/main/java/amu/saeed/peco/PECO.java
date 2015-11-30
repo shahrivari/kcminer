@@ -91,7 +91,7 @@ public class PECO extends Configured implements Tool {
 
 
         /*** Run Maximal Clique Main Job ***/
-        Job job = new Job(conf, "PECO");
+        Job job = new Job(conf, "PECO-" + inDir + "-" + k);
         job.setJarByClass(PECO.class);
 
         job.setNumReduceTasks(numReduce);        //Set number of reduce tasks
