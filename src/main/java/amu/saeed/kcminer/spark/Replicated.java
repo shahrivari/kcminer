@@ -53,14 +53,12 @@ public class Replicated {
                 vertices.add(v);
         Collections.shuffle(vertices);
 
-        JavaRDD<KCliqueState> twos = sc.parallelize(vertices, params.numTasks).flatMap(t ->
-                new KCliqueState(t, graphBroadcast.value().getBiggerNeighbors(t))
-                        .getChildren(graphBroadcast.value()));
+        JavaRDD<KCliqueState> twos = sc.parallelize(vertices, params.numTasks).flatMap(
+            t -> new KCliqueState(t, graphBroadcast.value().getBiggerNeighbors(t)).getChildren(graphBroadcast.value()));
 
-        JavaRDD<KCliqueState> beginningStates = twos.flatMap(t ->
-                t.getChildren(graphBroadcast.value()).stream()
-                        .filter(s -> s.clique.length + s.extSize >= params.k).collect(Collectors.toList()))
-                .repartition(params.numTasks);
+        JavaRDD<KCliqueState> beginningStates = twos.flatMap(
+            t -> t.getChildren(graphBroadcast.value()).stream().filter(s -> s.clique.length + s.extSize >= params.k)
+                .collect(Collectors.toList())).repartition(params.numTasks);
 
         beginningStates.map(t -> {
             cliqueCount.add(t.countKCliques(params.k, graphBroadcast.value()));
@@ -69,19 +67,15 @@ public class Replicated {
 
         int totalCores = sc.getConf().getInt("spark.cores.max", 0);
         System.out.printf("Graph:%s   Size:%d   Count:%,d   Cores:%d   Took:%s\n", params.inputPath, params.k,
-                cliqueCount.value(), totalCores, stopwatch);
+            cliqueCount.value(), totalCores, stopwatch);
         sc.close();
     }
 
     private static class Params implements Serializable {
-        @Option(name = "-local", usage = "run locally")
-        boolean local = false;
-        @Option(name = "-k", usage = "size of the cliques to mine.", required = true)
-        int k;
-        @Option(name = "-t", usage = "number of tasks to launch", required = true)
-        int numTasks;
-        @Option(name = "-i", usage = "the input path", required = true)
-        String inputPath;
+        @Option(name = "-local", usage = "run locally") boolean local = false;
+        @Option(name = "-k", usage = "size of the cliques to mine.", required = true) int k;
+        @Option(name = "-t", usage = "number of tasks to launch", required = true) int numTasks;
+        @Option(name = "-i", usage = "the input path", required = true) String inputPath;
     }
 
 }
