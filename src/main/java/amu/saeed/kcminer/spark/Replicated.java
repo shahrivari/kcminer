@@ -16,10 +16,8 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.stream.Collectors;
 
-/**
- * Created by Saeed on 8/21/2015.
- */
 public class Replicated {
     public static void main(String[] args) throws IOException {
         Params params = new Params();
@@ -46,43 +44,44 @@ public class Replicated {
 
         Graph graph = Graph.buildFromEdgeListFile(params.inputPath);
         final Broadcast<Graph> graphBroadcast = sc.broadcast(graph);
+
+        Stopwatch stopwatch = Stopwatch.createStarted();
+
         ArrayList<Integer> vertices = new ArrayList(graph.vertices.length);
         for (int v : graph.vertices)
             if (graph.getBiggerNeighbors(v).length + 1 >= params.k)
                 vertices.add(v);
         Collections.shuffle(vertices);
 
-        Stopwatch stopwatch = Stopwatch.createStarted();
+        JavaRDD<KCliqueState> twos = sc.parallelize(vertices, params.numTasks).flatMap(t ->
+                new KCliqueState(t, graphBroadcast.value().getBiggerNeighbors(t))
+                        .getChildren(graphBroadcast.value()));
 
-        JavaRDD<KCliqueState> twos = sc.parallelize(vertices).flatMap(
-            t -> new KCliqueState(t, graphBroadcast.value().getBiggerNeighbors(t)).getChildren(graphBroadcast.value()))
-            .repartition(params.graphParts);
+        JavaRDD<KCliqueState> beginningStates = twos.flatMap(t ->
+                t.getChildren(graphBroadcast.value()).stream()
+                        .filter(s -> s.clique.length + s.extSize >= params.k).collect(Collectors.toList()))
+                .repartition(params.numTasks);
 
-        JavaRDD<KCliqueState> threes = twos.flatMap(t -> {
-            ArrayList<KCliqueState> result = new ArrayList();
-            for (KCliqueState threeState : t.getChildren(graphBroadcast.value()))
-                if (threeState.clique.length + threeState.extSize >= params.k)
-                    result.add(threeState);
-            return result;
-        }).repartition(params.numTasks);
-
-        threes.map(t -> {
+        beginningStates.map(t -> {
             cliqueCount.add(t.countKCliques(params.k, graphBroadcast.value()));
-            return 1;
+            return 0;
         }).count();
 
         int totalCores = sc.getConf().getInt("spark.cores.max", 0);
         System.out.printf("Graph:%s   Size:%d   Count:%,d   Cores:%d   Took:%s\n", params.inputPath, params.k,
-            cliqueCount.value(), totalCores, stopwatch);
+                cliqueCount.value(), totalCores, stopwatch);
         sc.close();
     }
 
     private static class Params implements Serializable {
-        @Option(name = "-local", usage = "run locally") boolean local = false;
-        @Option(name = "-k", usage = "size of the cliques to mine.", required = true) int k;
-        @Option(name = "-t", usage = "number of tasks to launch", required = true) int numTasks;
-        @Option(name = "-p", usage = "number of graph partitions") int graphParts = 200;
-        @Option(name = "-i", usage = "the input path", required = true) String inputPath;
+        @Option(name = "-local", usage = "run locally")
+        boolean local = false;
+        @Option(name = "-k", usage = "size of the cliques to mine.", required = true)
+        int k;
+        @Option(name = "-t", usage = "number of tasks to launch", required = true)
+        int numTasks;
+        @Option(name = "-i", usage = "the input path", required = true)
+        String inputPath;
     }
 
 }
