@@ -36,7 +36,7 @@ public class Replicated {
             conf.setMaster("local[8]");
         conf.set("spark.executor.memory", "4g");
         conf.set("spark.akka.frameSize", "128");
-        conf.set("spark.storage.memoryFraction", "0.1");
+        conf.set("spark.storage.memoryFraction", "0.5");
         conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
 
         JavaSparkContext sc = new JavaSparkContext(conf);
